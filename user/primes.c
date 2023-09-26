@@ -8,36 +8,50 @@
 #include "kernel/types.h"
 #include "user/user.h"
 
-int main() {
+#define SEIVE_BOUND 35
 
-  int fds[2];
-  pipe(fds);
-
-  // dummy head neighbor
-  for (uint i = 2; i <= 35; ++i) {
-    write(fds[1], &i, 4);
-  }
-  // eof
-  write(fds[1], "\0\0\0\0", 4);
+// seive from left, send to right
+__attribute__((noreturn)) void pass(int l) {
 
   int p, n;
-  while (1) {
-    // receive and print first
-    read(fds[0], &p, 4);
-    if (p == 0)
-      break;
-    printf("prime %d\n", p);
+  int r[2];
 
-    // seive and sent others
-    while (1) {
-      read(fds[0], &n, 4);
-      if (n == 0)
-        break;
-      if (n % p)
-        write(fds[1], &n, 4);
+  // recv from left
+  if (!read(l, &p, sizeof(int)))
+    exit(0);
+  printf("prime %d\n", p);
+
+  pipe(r);
+
+  if (fork()) {
+    // seive
+    while (read(l, &n, sizeof(int))) {
+      if (n % p) {
+        write(r[1], &n, sizeof(int));
+      }
     }
+    close(l);
+    close(r[1]);
+    wait(0);
 
-    write(fds[1], "\0\0\0\0", 4);
+  } else {
+    // send to right
+    close(r[1]);
+    pass(r[0]);
   }
+  exit(0);
+}
+
+int main() {
+  int r[2];
+  pipe(r);
+
+  // dummy left
+  for (int i = 2; i <= SEIVE_BOUND; ++i) {
+    write(r[1], &i, sizeof(int));
+  }
+  close(r[1]);
+  pass(r[0]);
+
   exit(0);
 }
