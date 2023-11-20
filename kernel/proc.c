@@ -687,3 +687,16 @@ procdump(void)
     printf("\n");
   }
 }
+
+// count the number of process
+// linear iter, since < 64 procs
+// PERF: an online way...
+uint64 count_nproc(void) {
+  uint64 nproc = 0;
+  struct proc* p;
+  for(p = proc; p < &proc[NPROC]; p++){
+    if(p->state == UNUSED) continue;
+    ++nproc;
+  }
+  return nproc;
+}
