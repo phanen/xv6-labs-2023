@@ -461,8 +461,6 @@ permprint(pte_t pte) {
   printf(perm_s);
 }
 
-#define VMPRINT_PERM
-
 // recursively print pte in pgtbl
 static void
 _vmprintwalk(pagetable_t pagetable, int lvl, char **ind_tbl)

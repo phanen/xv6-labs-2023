@@ -74,7 +74,41 @@ sys_sleep(void)
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
+  uint64 va;
+  argaddr(0, &va);
+  int pg_n;
+  argint(1, &pg_n);
+  uint64 umask_ptr;
+  argaddr(2, &umask_ptr);
+
+  pagetable_t pagetable = myproc()->pagetable;
+
+  // HACK: multiplex it...
+#ifdef VMPRINT_STUB
+  if (pg_n == -1) {
+    struct proc *p = myproc();
+    if(!memcmp(p->name, "pgtbltest", strlen(p->name))) vmprint(p->pagetable);
+    return 0;
+  }
+#endif
+
+  // poor test limit, use 32 bit
+  uint kb = 0;
+  uint64 va_c = va;
+  pg_n = pg_n < 32 ? pg_n : 32;
+  for (int i = 0; i < pg_n; ++i) {
+    pte_t* pte = walk(pagetable, va, 0);
+    if (*pte & PTE_A) kb |= (1 << i);
+    va += PGSIZE;
+    // *pte = (*pte & PTE_A) ^ *pte;
+  }
+  copyout(pagetable, umask_ptr, (char*)&kb, 4);
+
+  for (int i = 0; i < pg_n; ++i) {
+    pte_t* pte = walk(pagetable, va_c, 0);
+    *pte = (*pte & PTE_A) ^ *pte;
+    va_c += PGSIZE;
+  }
   return 0;
 }
 #endif
