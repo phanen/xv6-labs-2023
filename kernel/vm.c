@@ -450,6 +450,19 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
+// show perm string
+void
+permprint(pte_t pte) {
+  char perm_s[10] = "DAGUSWRV\n\0";
+  // char *perm_s = "DAGUSWRV\n"; // error...
+  for (int i = 0; i < 8; ++i) {
+    if ((pte & (1L << i)) == 0) perm_s[7 - i] = '-';
+  }
+  printf(perm_s);
+}
+
+#define VMPRINT_PERM
+
 // recursively print pte in pgtbl
 static void
 _vmprintwalk(pagetable_t pagetable, int lvl, char **ind_tbl)
@@ -459,7 +472,11 @@ _vmprintwalk(pagetable_t pagetable, int lvl, char **ind_tbl)
     pte_t pte = pagetable[i];
     uint64 pa = PTE2PA(pte);
     if(pte & PTE_V){
+#ifdef VMPRINT_PERM
+      printf("%s%d: pte %p pa %p ", ind_tbl[lvl], i, pte, pa); permprint(pte);
+#else
       printf("%s%d: pte %p pa %p\n", ind_tbl[lvl], i, pte, pa);
+#endif
       _vmprintwalk((pagetable_t)pa, lvl+1, ind_tbl);
     }
   }
