@@ -133,3 +133,18 @@ printfinit(void)
   initlock(&pr.lock, "pr");
   pr.locking = 1;
 }
+
+void
+backtrace(void)
+{
+  // PERF: seems that is handle non-leaf only?
+  uint64 fp = r_fp();
+  // all the stack frames for a given stack are on the same page
+  // i.e. all fp in the same page as the first fp
+  uint64 top = PGROUNDUP(fp);
+  uint64 btm = PGROUNDDOWN(fp);
+  while(fp < top && fp > btm) {
+    printf("%p\n", *(uint64*)(fp - 8));
+    fp = *(uint64*)(fp - 16);
+  }
+}
