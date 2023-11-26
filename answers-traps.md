@@ -31,9 +31,30 @@ printf("x=%d y=%d", 3);
 ```
 - peek stack? depends on va_arg impl..
 
-
-
 ## backtrace
 
-> Note that the return address lives at a fixed offset (-8) from the frame pointer of a stackframe, and that the saved frame pointer lives at fixed offset (-16) from the frame pointer.
-- maybe not... for leaf, `ra` didn't need to be maintained -> `fp = sp-8`
+for leaf, `ra` will not be saved, `fp = sp-8` rather than `fp = sp-16` ???
+- (who care, we don't use bt in leaf in this lab...
+```asm
+  // non-leaf prologue (main)
+  addi	sp,sp,-16
+  sd	ra,8(sp)
+  sd	s0,0(sp)
+  addi	s0,sp,16
+  // leaf prologue (strcpy)
+  addi	sp,sp,-16
+  sd	s0,8(sp)
+  addi	s0,sp,16
+```
+
+but why `addi sp,sp,-16`
+> In the standard RISC-V calling convention, the stack grows downward and the stack pointer is always kept 16-byte aligned.
+
+## alarm
+
+note
+- bug: `periodic = 0` in user virtual address, `sigalarm(0, 0)` is ambiguous
+  - use `sigalarm(0, x)` instead
+- avoid reentrant: no lock needed, and flag `p->alarm_running` is enough
+    - since at most one handler can running
+- resume `a0`: rewrite it by `syscall[num]()`, so `return p->trapframe->a0`
