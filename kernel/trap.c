@@ -66,7 +66,18 @@ usertrap(void)
 
     syscall();
   } else if((which_dev = devintr()) != 0){
-    // ok
+    // since alarm_handler is user's va, 0x0 can be usable
+    if(which_dev == 2 && p->alarm_interval) {
+      ++p->alarm_ticks;
+      if (p->alarm_ticks == p->alarm_interval && p->alarm_running == 0) {
+        p->alarm_ticks = 0;
+        p->alarm_running = 1; // no need lock here
+        // nest `sigalarm(non-zero, x)` is forbidden now, since it will overwrite snapshot
+        *(p->snapshot) = *(p->trapframe);
+        // the other regs will be reused, user should be careful not to erase the above stack...
+        p->trapframe->epc = p->alarm_handler;
+      }
+    }
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
