@@ -180,6 +180,10 @@ filetest()
 int
 main(int argc, char *argv[])
 {
+  // int a = *(uint64*)0;
+  // printf("%x\n", a);
+  // *(uint64*)0 = 1;
+
   simpletest();
 
   // check that the first simpletest() freed the physical memory.

@@ -177,6 +177,7 @@ pagetable_t
 proc_pagetable(struct proc *p)
 {
   pagetable_t pagetable;
+  // printf("begin create page table\n");
 
   // An empty page table.
   pagetable = uvmcreate();
@@ -202,6 +203,7 @@ proc_pagetable(struct proc *p)
     return 0;
   }
 
+  // printf("done create page table\n");
   return pagetable;
 }
 
@@ -289,7 +291,8 @@ fork(void)
   }
 
   // Copy user memory from parent to child.
-  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
+  if(cow_uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
+  // if(cow_uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
     release(&np->lock);
     return -1;

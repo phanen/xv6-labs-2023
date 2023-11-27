@@ -141,7 +141,7 @@ kvmmap(pagetable_t kpgtbl, uint64 va, uint64 pa, uint64 sz, int perm)
 // Returns 0 on success, -1 if walk() couldn't
 // allocate a needed page-table page.
 int
-mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
+_mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 {
   uint64 a, last;
   pte_t *pte;
@@ -171,6 +171,45 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   return 0;
 }
 
+int
+mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
+{
+  uint64 a, last;
+  pte_t *pte;
+
+  if((va % PGSIZE) != 0)
+    panic("vmappages: va not aligned");
+
+  if((size % PGSIZE) != 0)
+    panic("mappages: size not aligned");
+
+  if(size == 0)
+    panic("mappages: size");
+  
+  a = va;
+  last = va + size - PGSIZE;
+  for(;;){
+    // pages alloc by walk are not important
+    // care no about their rc...
+    if((pte = walk(pagetable, a, 1)) == 0)
+      return -1;
+    if(*pte & PTE_V) {
+      uint64 oldpa = PTE2PA(*pte);
+      rc_t *rc = rcaddr(oldpa);
+      if (*rc <= 0)
+        panic("uvmunmap: rc <= 0");
+      --*rc;
+    }
+    *pte = PA2PTE(pa) | perm | PTE_V;
+    ++*rcaddr(pa);
+    if(a == last)
+      break;
+    a += PGSIZE;
+    pa += PGSIZE;
+  }
+  return 0;
+}
+
 // Remove npages of mappings starting from va. va must be
 // page-aligned. The mappings must exist.
 // Optionally free the physical memory.
@@ -190,8 +229,12 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
+    uint64 pa = PTE2PA(*pte);
+    rc_t *rc = rcaddr(pa);
+    if (*rc <= 0)
+      panic("uvmunmap: rc <= 0");
+    --*rc;
     if(do_free){
-      uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
     }
     *pte = 0;
@@ -339,6 +382,32 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   return -1;
 }
 
+int
+cow_uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
+{
+  pte_t *pte;
+  uint64 pa, i;
+  uint flags;
+
+  for(i = 0; i < sz; i += PGSIZE){
+    if((pte = walk(old, i, 0)) == 0)
+      panic("uvmcopy: pte should exist");
+    if((*pte & PTE_V) == 0)
+      panic("uvmcopy: page not present");
+    pa = PTE2PA(*pte);
+    flags = PTE_FLAGS(*pte);
+    // for COW/non-W page, flags has been ready
+    if (flags & PTE_W)
+      flags = (flags & ~PTE_W) | PTE_COW;
+    // update pte of parent page
+    *pte = PA2PTE(pa) | flags;
+    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+      return -1;
+    }
+  }
+  return 0;
+}
+
 // mark a PTE invalid for user access.
 // used by exec for the user stack guard page.
 void
@@ -366,6 +435,11 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     if(va0 >= MAXVA)
       return -1;
     pte = walk(pagetable, va0, 0);
+    if ((*pte & PTE_V) && (*pte & PTE_COW)) {
+      // printf("%d cow_copyout\n", myproc()->pid);
+      if (cowpage(pte) != 0)
+        return -1;
+    }
     if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 ||
        (*pte & PTE_W) == 0)
       return -1;
@@ -448,4 +522,28 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+int
+cowpage(pte_t *pte){
+  uint64 pa = PTE2PA(*pte);
+  rc_t *rc = rcaddr(pa);
+  if (*rc <= 0) {
+    printf("cow page with rc <= 0, should not happen\n");
+    return -1;
+  }
+
+  *pte = (*pte & ~PTE_COW) | PTE_W;
+  if (*rc == 1) // nothing more todo
+    return 0;
+  uint64 newpa = (uint64)kalloc();
+  if (newpa == 0) {
+    printf("cow, but no free memory\n");
+    return -1;
+  }
+  memmove((char*)newpa, (char*)pa, PGSIZE);
+  *pte = PA2PTE(newpa) | PTE_FLAGS(*pte);
+  --*rc;
+  ++*rcaddr(newpa);
+  return 0;
 }

@@ -67,7 +67,20 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  } else if (r_scause() == 0xf) {
+    // Store/AMO page fault
+    uint64 va = r_stval();
+    pte_t *pte = walk(p->pagetable, va, 0);
+    if ((*pte & PTE_COW) == 0) { // read-only page
+      printf("writing a read-only page\n");
+      goto kill;
+    }
+    // printf("%d cow_trap\n", myproc()->pid);
+    if (cowpage(pte) != 0)
+      goto kill;
+  }
+  else {
+  kill:
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);
