@@ -18,7 +18,7 @@ extern char end[]; // first address after kernel.
 
 static uint8 maprc[PA2ID(PHYSTOP)];
 
-#define KMEM_DBG
+// #define KMEM_DBG
 uint64 freepg;
 
 #ifdef KMEM_DBG
@@ -80,15 +80,19 @@ kfree(void *pa)
 
   if (*rcaddr((uint64)pa) <= 0)
     panic("kfree: rc <= 0");
-  if (--*rcaddr((uint64)pa))
+
+  acquire(&kmem.lock);
+  if (--*rcaddr((uint64)pa)) {
+    release(&kmem.lock);
     return;
+  }
 
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
   r = (struct run*)pa;
 
-  acquire(&kmem.lock);
+  // acquire(&kmem.lock);
   r->next = kmem.freelist;
   kmem.freelist = r;
   release(&kmem.lock);
@@ -107,7 +111,7 @@ kalloc(void)
   r = kmem.freelist;
   if(r) {
     kmem.freelist = r->next;
-    ++*rcaddr((uint64)r);
+    *rcaddr((uint64)r) = 1;
   }
   release(&kmem.lock);
 

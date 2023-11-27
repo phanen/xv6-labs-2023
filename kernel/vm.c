@@ -595,6 +595,8 @@ cowpage(pte_t *pte){
   // rc of newpa has been 1
   memmove((char*)newpa, (char*)pa, PGSIZE);
   *pte = PA2PTE(newpa) | PTE_FLAGS(*pte);
-  --*rc;
+  kfree((void*)pa);
+  // we need lock anyway...
+  // --*rc;
   return 0;
 }

@@ -33,6 +33,11 @@ simpletest()
     exit(-1);
   }
 
+  // writing... make it not simple...
+  // for(char *q = p; q < p + sz; q += 4096){
+  //   *(int*)q = getpid();
+  // }
+
   if(pid == 0)
     exit(0);
 
