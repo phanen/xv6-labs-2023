@@ -420,11 +420,12 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    // for COW/non-W page, flags has been ready
-    if (flags & PTE_W)
+    // for already COW/non-W page, flags has been ready
+    // set COW for W, then upd parent pte as well
+    if (flags & PTE_W) {
       flags = (flags & ~PTE_W) | PTE_COW;
-    // update pte of parent page
-    *pte = PA2PTE(pa) | flags;
+      *pte = PA2PTE(pa) | flags;
+    }
     if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0)
       return -1;
     ++*rcaddr(pa);
@@ -486,14 +487,13 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     if(va0 >= MAXVA)
       return -1;
     pte = walk(pagetable, va0, 0);
-    if ((*pte & PTE_V) && (*pte & PTE_COW)) {
+    if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0)
+      return -1;
+    if ((*pte & PTE_W) == 0 && (*pte & PTE_COW)) {
       // printf("%d cow_copyout\n", myproc()->pid);
       if (cowpage(pte) != 0)
         return -1;
     }
-    if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 ||
-       (*pte & PTE_W) == 0)
-      return -1;
     pa0 = PTE2PA(*pte);
     n = PGSIZE - (dstva - va0);
     if(n > len)
@@ -592,9 +592,9 @@ cowpage(pte_t *pte){
     printf("cow, but no free memory\n");
     return -1;
   }
+  // rc of newpa has been 1
   memmove((char*)newpa, (char*)pa, PGSIZE);
   *pte = PA2PTE(newpa) | PTE_FLAGS(*pte);
   --*rc;
-  ++*rcaddr(newpa);
   return 0;
 }
