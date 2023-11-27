@@ -489,11 +489,13 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     pte = walk(pagetable, va0, 0);
     if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0)
       return -1;
-    if ((*pte & PTE_W) == 0 && (*pte & PTE_COW)) {
-      // printf("%d cow_copyout\n", myproc()->pid);
-      if (cowpage(pte) != 0)
-        return -1;
-    }
+    // cow first if needed
+    if ((*pte & PTE_W) == 0 && (*pte & PTE_COW) == 0)
+      return -1;
+    if ((*pte & PTE_W) == 0 && (*pte & PTE_COW) && cowpage(pte) != 0)
+      return -1;
+    // should be writable now
+    // both PTE_W and PTE_COW? should not happend
     pa0 = PTE2PA(*pte);
     n = PGSIZE - (dstva - va0);
     if(n > len)
