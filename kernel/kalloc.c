@@ -18,6 +18,20 @@ extern char end[]; // first address after kernel.
 
 static uint8 maprc[PA2ID(PHYSTOP)];
 
+#define KMEM_DBG
+uint64 freepg;
+
+#ifdef KMEM_DBG
+#define GRID 10000
+#define showfree(i) do {\
+  if ((i)) ++freepg; else --freepg;\
+  if (freepg % GRID == 0) printf("%s: %d\n", (i) ? "+" : "-", freepg);\
+} while(0);
+#else
+#define showfree(_)
+#endif
+
+
 struct run {
   struct run *next;
 };
@@ -41,6 +55,7 @@ freerange(void *pa_start, void *pa_end)
   struct run *r;
   p = (char*)PGROUNDUP((uint64)pa_start);
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE) {
+    ++freepg;
     r = (struct run*)p;
     // Fill with junk to catch dangling refs.
     memset(p, 1, PGSIZE);
@@ -77,6 +92,7 @@ kfree(void *pa)
   r->next = kmem.freelist;
   kmem.freelist = r;
   release(&kmem.lock);
+  showfree(1);
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -97,6 +113,7 @@ kalloc(void)
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
+  showfree(0);
   return (void*)r;
 }
 
