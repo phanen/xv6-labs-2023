@@ -428,7 +428,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     }
     if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0)
       return -1;
-    ++*rcaddr(pa);
+    pgrcinc(pa);
   }
   return 0;
 }
@@ -576,16 +576,17 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 }
 
 int
-cowpage(pte_t *pte){
+cowpage(pte_t *pte)
+{
   uint64 pa = PTE2PA(*pte);
-  rc_t *rc = rcaddr(pa);
-  if (*rc <= 0) {
+  rc_t rc = pgrc(pa);
+  if (rc <= 0) {
     printf("cow page with rc <= 0, should not happen\n");
     return -1;
   }
 
   *pte = (*pte & ~PTE_COW) | PTE_W;
-  if (*rc == 1) // nothing more todo
+  if (rc == 1) // nothing more todo
     return 0;
   uint64 newpa = (uint64)kalloc();
   if (newpa == 0) {
@@ -595,8 +596,6 @@ cowpage(pte_t *pte){
   // rc of newpa has been 1
   memmove((char*)newpa, (char*)pa, PGSIZE);
   *pte = PA2PTE(newpa) | PTE_FLAGS(*pte);
-  kfree((void*)pa);
-  // we need lock anyway...
-  // --*rc;
+  pgrcdec(pa);
   return 0;
 }

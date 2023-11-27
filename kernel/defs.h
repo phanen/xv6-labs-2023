@@ -63,7 +63,10 @@ void            ramdiskrw(struct buf*);
 void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
-rc_t *          rcaddr(uint64);
+void            pgrcinc(uint64);
+rc_t            pgrcdec(uint64);
+rc_t*           rcaddr(uint64); // for compatibility..
+rc_t            pgrc(uint64);
 
 // log.c
 void            initlog(int, struct superblock*);

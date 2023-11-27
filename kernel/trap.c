@@ -31,7 +31,8 @@ trapinithart(void)
 
 // handler page fault
 int
-pgfault(pte_t *pte, uint64 va) {
+pgfault(pte_t *pte, uint64 va)
+{
   if ((*pte & PTE_COW) == 0) { // read-only page
     printf("writing a read-only page\n");
     return -1;

@@ -16,8 +16,6 @@ extern char end[]; // first address after kernel.
 
 #define PA2ID(pa) ((uint64)(pa) >> 12)
 
-static uint8 maprc[PA2ID(PHYSTOP)];
-
 // #define KMEM_DBG
 uint64 freepg;
 
@@ -31,7 +29,6 @@ uint64 freepg;
 #define showfree(_)
 #endif
 
-
 struct run {
   struct run *next;
 };
@@ -39,7 +36,13 @@ struct run {
 struct {
   struct spinlock lock;
   struct run *freelist;
+  rc_t pgrc[PA2ID(PHYSTOP)];
 } kmem;
+
+inline rc_t*
+rcaddr(uint64 pa) {
+  return &kmem.pgrc[PA2ID(pa)];
+}
 
 void
 kinit()
@@ -121,8 +124,23 @@ kalloc(void)
   return (void*)r;
 }
 
-// get its rc ptr from physical address
-rc_t*
-rcaddr(uint64 pa) {
-  return &maprc[PA2ID(pa)];
+inline void
+pgrcinc(uint64 pa) {
+  acquire(&kmem.lock);
+  ++kmem.pgrc[PA2ID(pa)];
+  release(&kmem.lock);
+}
+
+inline rc_t
+pgrcdec(uint64 pa) {
+  rc_t rc;
+  acquire(&kmem.lock);
+  rc = --kmem.pgrc[PA2ID(pa)];
+  release(&kmem.lock);
+  return rc;
+}
+
+inline rc_t
+pgrc(uint64 pa) {
+  return kmem.pgrc[PA2ID(pa)];
 }
