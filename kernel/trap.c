@@ -31,8 +31,13 @@ trapinithart(void)
 
 // handler page fault
 int
-pgfault(pte_t *pte, uint64 va)
+pgfault(uint64 va)
 {
+  pte_t *pte = walk(myproc()->pagetable, va, 0);
+  if (pte == 0) {
+    printf("pgfault: walk error");
+    return -1;
+  }
   if ((*pte & PTE_COW) == 0) { // read-only page
     printf("writing a read-only page\n");
     return -1;
@@ -84,8 +89,7 @@ usertrap(void)
   } else if (r_scause() == 0xf) {
     // Store/AMO page fault
     uint64 va = r_stval();
-    pte_t *pte = walk(myproc()->pagetable, va, 0);
-    if (pgfault(pte, va) != 0)
+    if (pgfault(va) != 0)
       goto kill;
   }
   else {
