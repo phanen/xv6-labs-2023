@@ -78,7 +78,7 @@ copyout(char *s)
 {
   uint64 addrs[] = { 0LL, 0x80000000LL, 0xffffffffffffffff };
 
-  for(int ai = 0; ai < 2; ai++){
+  for(int ai = 0; ai < 3; ai++){
     uint64 addr = addrs[ai];
 
     int fd = open("README", 0);
