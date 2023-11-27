@@ -33,6 +33,9 @@ trapinithart(void)
 int
 pgfault(uint64 va)
 {
+  // maybe this is bug in walk...anyway
+  if (va >= MAXVA)
+    return -1;
   pte_t *pte = walk(myproc()->pagetable, va, 0);
   if (pte == 0) {
     printf("pgfault: walk error");
