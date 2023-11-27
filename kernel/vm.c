@@ -377,7 +377,7 @@ uvmfree(pagetable_t pagetable, uint64 sz)
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
 int
-uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
+_uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
   pte_t *pte;
   uint64 pa, i;
@@ -407,7 +407,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 }
 
 int
-_uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
+uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
   pte_t *pte;
   uint64 pa, i;
@@ -425,9 +425,9 @@ _uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       flags = (flags & ~PTE_W) | PTE_COW;
     // update pte of parent page
     *pte = PA2PTE(pa) | flags;
-    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0)
       return -1;
-    }
+    ++*rcaddr(pa);
   }
   return 0;
 }
@@ -449,7 +449,7 @@ uvmclear(pagetable_t pagetable, uint64 va)
 // Copy len bytes from src to virtual address dstva in a given page table.
 // Return 0 on success, -1 on error.
 int
-copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
+_copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
   pte_t *pte;
@@ -476,7 +476,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 }
 
 int
-_copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
+copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
   pte_t *pte;

@@ -38,9 +38,17 @@ void
 freerange(void *pa_start, void *pa_end)
 {
   char *p;
+  struct run *r;
   p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
-    kfree(p);
+  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE) {
+    r = (struct run*)p;
+    // Fill with junk to catch dangling refs.
+    memset(p, 1, PGSIZE);
+    acquire(&kmem.lock);
+    r->next = kmem.freelist;
+    kmem.freelist = r;
+    release(&kmem.lock);
+  }
 }
 
 // Free the page of physical memory pointed at by pa,
@@ -55,7 +63,9 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  if (*rcaddr((uint64)pa))
+  if (*rcaddr((uint64)pa) <= 0)
+    panic("kfree: rc <= 0");
+  if (--*rcaddr((uint64)pa))
     return;
 
   // Fill with junk to catch dangling refs.
@@ -79,8 +89,10 @@ kalloc(void)
 
   acquire(&kmem.lock);
   r = kmem.freelist;
-  if(r)
+  if(r) {
     kmem.freelist = r->next;
+    ++*rcaddr((uint64)r);
+  }
   release(&kmem.lock);
 
   if(r)

@@ -29,6 +29,19 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+// handler page fault
+int
+pgfault(pte_t *pte, uint64 va) {
+  if ((*pte & PTE_COW) == 0) { // read-only page
+    printf("writing a read-only page\n");
+    return -1;
+  }
+  // printf("%d cow_trap\n", myproc()->pid);
+  if (cowpage(pte) != 0)
+    return -1;
+  return 0;
+}
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -70,13 +83,8 @@ usertrap(void)
   } else if (r_scause() == 0xf) {
     // Store/AMO page fault
     uint64 va = r_stval();
-    pte_t *pte = walk(p->pagetable, va, 0);
-    if ((*pte & PTE_COW) == 0) { // read-only page
-      printf("writing a read-only page\n");
-      goto kill;
-    }
-    // printf("%d cow_trap\n", myproc()->pid);
-    if (cowpage(pte) != 0)
+    pte_t *pte = walk(myproc()->pagetable, va, 0);
+    if (pgfault(pte, va) != 0)
       goto kill;
   }
   else {
