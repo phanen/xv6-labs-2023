@@ -17,7 +17,13 @@ struct entry *table[NBUCKET];
 int keys[NKEYS];
 int nthread = 1;
 
+#define LOCK_BUCKET
+
+#ifdef LOCK_BUCKET
+pthread_mutex_t locks[NBUCKET];
+#else
 pthread_mutex_t lock;
+#endif
 
 double
 now()
@@ -53,9 +59,15 @@ void put(int key, int value)
     e->value = value;
   } else {
     // the new is new.
+#ifdef LOCK_BUCKET
+    pthread_mutex_lock(&locks[i]);
+    insert(key, value, &table[i], table[i]);
+    pthread_mutex_unlock(&locks[i]);
+#else
     pthread_mutex_lock(&lock);
     insert(key, value, &table[i], table[i]);
     pthread_mutex_unlock(&lock);
+#endif
   }
 
 }
@@ -120,7 +132,13 @@ main(int argc, char *argv[])
   for (int i = 0; i < NKEYS; i++) {
     keys[i] = random();
   }
+#ifdef LOCK_BUCKET
+  for (int i = 0; i < NBUCKET; i++) {
+    pthread_mutex_init(&locks[i], NULL);
+  }
+#else
   pthread_mutex_init(&lock, NULL);
+#endif
 
   //
   // first the puts

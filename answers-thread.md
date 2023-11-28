@@ -20,7 +20,7 @@ int main() {
 
 ## ph
 
-given random KV storage, then:
+Given random KV storage, then:
 - each thread put some random KV
 - join
 - each thread get all KVs that should exist
@@ -48,3 +48,9 @@ pthread_mutex_unlock(&lock);
 Pass `ph_fast`: two threads yield at least 1.25 times as many puts/second as one thread
 - parallel some ops while maintaining correctness.
 - the above impl is enough for my pc...
+
+Intuition: lock a single bucket rather than the whole KV storage...
+- but it didn't run faster in my pc...
+- maybe more lock introduce more overhead
+
+TODO: maybe we can test more threads....
