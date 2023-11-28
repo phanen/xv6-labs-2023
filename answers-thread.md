@@ -54,3 +54,19 @@ Intuition: lock a single bucket rather than the whole KV storage...
 - maybe more lock introduce more overhead
 
 TODO: maybe we can test more threads....
+- `./ph 4` -> about 4 rate
+- `./ph 10` -> about 5~6 rate...
+
+
+## barrier
+
+difference from `pthread_join`?
+- `pthread_join` will wait for exit...
+- `barrier` just want to make sure sync
+
+```c
+pthread_cond_wait(&cond, &mutex);  // go to sleep on cond, releasing lock mutex, acquiring upon wake up
+pthread_cond_broadcast(&cond);     // wake up every thread sleeping on cond
+```
+
+talk is cheap, see the code...
