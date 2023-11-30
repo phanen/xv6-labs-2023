@@ -76,32 +76,6 @@ so why does it hurt?
 
 before steal
 ```
-
-start test1
-test1 results:
---- lock kmem/bcache stats
-lock: kmem0: #test-and-set 0 #acquire() 32968
-lock: kmem1: #test-and-set 0 #acquire() 201117
-lock: kmem2: #test-and-set 0 #acquire() 199099
-lock: bcache: #test-and-set 0 #acquire() 2994
---- top 5 contended locks:
-lock: proc: #test-and-set 142344 #acquire() 253298
-lock: virtio_disk: #test-and-set 100092 #acquire() 156
-lock: proc: #test-and-set 35561 #acquire() 652991
-lock: proc: #test-and-set 29632 #acquire() 652998
-lock: proc: #test-and-set 16750 #acquire() 252844
-tot= 0
-test1 OK
-start test2
-total free number of pages: 32497 (out of 32768)
-.....
-test2 OK
-start test3
-child done 1
-child done 100000
-test3 OK
-
-
 start test1
 test1 results:
 --- lock kmem/bcache stats
@@ -125,8 +99,7 @@ child done 100000
 test3 OK
 ```
 
-
-before steal
+after steal
 ```
 start test1
 test1 results:
@@ -134,7 +107,7 @@ test1 results:
 lock: kmem0: #test-and-set 0 #acquire() 32968
 lock: kmem1: #test-and-set 0 #acquire() 201117
 lock: kmem2: #test-and-set 0 #acquire() 199099
-lock: bcache: #test-and-set 1 #acquire() 2994
+lock: bcache: #test-and-set 0 #acquire() 2994
 --- top 5 contended locks:
 lock: proc: #test-and-set 142344 #acquire() 253298
 lock: virtio_disk: #test-and-set 100092 #acquire() 156
@@ -152,3 +125,19 @@ child done 1
 child done 100000
 test3 OK
 ```
+
+how `statistics` work
+- before test: write "statistics" file, then `m = ntas(0)`
+- after test: upd "statistics" file, then `n = ntas(0)`
+- `n - m` should be the diff to `tot` -> `#test-and-set` after init
+
+
+## bcache lock
+
+> like kalloctest's `fork`+`sbrk` to gen contentions on `kmem.lock`
+  bcachetest do `fork`+`read` to gen contentions on `bcache.lock`
+
+
+> For kalloc, one could eliminate most contention by giving each CPU its own allocator; that won't work for the block cache.
+- kalloc randomly pick mem from pool
+- "bcache-alloc" match target from pool first... but i don't figure out there're large difference...
