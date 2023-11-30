@@ -286,6 +286,8 @@ ifeq ($(LAB),fs)
 CPUS := 1
 endif
 
+CFLAGS += -DCPUS=$(CPUS)
+
 FWDPORT = $(shell expr `id -u` % 5000 + 25999)
 
 QEMUOPTS = -machine virt -bios none -kernel $K/kernel -m 128M -smp $(CPUS) -nographic
