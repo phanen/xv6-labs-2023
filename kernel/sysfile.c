@@ -346,7 +346,7 @@ sys_open(void)
           break;
       }
       if (ip->type == T_SYMLINK) {
-        printf("open: too many levels of symbolic links");
+        printf("open: too many levels of symbolic links\n");
         end_op();
         return -1;
       }
