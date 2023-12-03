@@ -187,6 +187,8 @@ uint64          walkaddr(pagetable_t, uint64);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
+uint64          umap(uint64 addr, int length, int prot, int flags, int fd, int offset);
+uint64          uunmap(uint64 addr, int length);
 
 // plic.c
 void            plicinit(void);
