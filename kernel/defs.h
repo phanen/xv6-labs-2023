@@ -1,6 +1,7 @@
 #ifdef LAB_MMAP
 typedef unsigned long size_t;
 typedef long int off_t;
+struct vma;
 #endif
 struct buf;
 struct context;
@@ -245,4 +246,13 @@ void            sockclose(struct sock *);
 int             sockread(struct sock *, uint64, int);
 int             sockwrite(struct sock *, uint64, int);
 void            sockrecvudp(struct mbuf*, uint32, uint16, uint16);
+#endif
+
+#ifdef LAB_MMAP
+
+// vma.c
+void            vmainit(void);
+struct vma*     vget(void);
+int             mmap(struct vma*, pagetable_t, uint64);
+
 #endif

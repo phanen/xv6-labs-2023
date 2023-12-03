@@ -15,6 +15,7 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include "memlayout.h"
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -504,26 +505,143 @@ sys_pipe(void)
   return 0;
 }
 
+// only update vma in proc struct
+// actual "mmap" will be defered to page fault
 uint64
 sys_mmap(void)
 {
   uint64 addr;
-  int length, prot, flags, fd, offset;
+  size_t length;
+  int prot, flags, fd, offset;
+  struct file *f;
+
 	argaddr(0, &addr);
-	argint(1, &length);
+  // let kernel decide the va
+  if (addr != 0) {
+    printf("mmap: not support custom address\n");
+    return -1;
+  }
+
+	argaddr(1, &length);
+  if (length == 0 || length > VMASZ) {
+    printf("mmap: length\n");
+    return -1;
+  }
+
+  if (argfd(4, &fd, &f) != 0) {
+    printf("mmap: fd\n");
+    return -1;
+  }
+
+	argint(5, &offset);
+  if (offset < 0) {
+    printf("mmap: offset\n");
+  }
+
 	argint(2, &prot);
 	argint(3, &flags);
-	argint(4, &fd);
-	argint(5, &offset);
-  return -1;
+
+  int perms = PTE_U;
+  if (prot & PROT_READ) {
+    if(f->readable == 0)
+      return -1;
+    perms |= PTE_R;
+  }
+  if (prot & PROT_WRITE) {
+    // if writable in mem, then should not write back
+    if(f->writable == 0 && (flags & MAP_PRIVATE) == 0)
+      return -1;
+    perms |= PTE_W;
+  }
+  if (prot & PROT_EXEC)
+    perms |= PTE_X;
+
+  struct vma* v = vget();
+  v->perms = perms;
+  v->file = f;
+  v->offset = offset;
+  v->flags = flags;
+  filedup(f);
+
+  // insert into per-proc vma list
+  struct proc *p = myproc();
+  if (p->vma == 0) {
+    addr = VMABASE;
+    v->next = 0;
+    p->vma = v;
+  }
+  else {
+    struct vma *pv = p->vma;
+    addr = PGROUNDUP(pv->end);
+    while(pv->next && addr + length >= pv->next->start) {
+      pv = pv->next;
+      addr = PGROUNDUP(pv->end);
+    }
+    // find a large enough region
+    v->next = pv->next;
+    pv->next = v;
+  }
+  // NOTE: v->start is page aligned
+  v->start = addr;
+  v->end = addr + length;
+  return addr;
 }
 
+// writeback mmap-ed page from user's va
+static int
+vwrite(struct vma *v, pagetable_t pagetable, uint64 va, uint64 n){
+  // TODO: maybe need copyout
+  return 0;
+}
+
+// unmap
+// unmap at most one vma region
+// both addr and length should be page-aligned
 uint64
 sys_munmap(void)
 {
   uint64 addr;
-  int length;
+  size_t length;
   argaddr(0, &addr);
-  argint(1, &length);
-  return -1;
+  argaddr(1, &length);
+
+  // NOTE: both should be page-aligned
+  // otherwise, we
+  if (addr % PGSIZE != 0 || length % PGSIZE != 0) {
+    printf("munmap: not page-aligned\n");
+    return -1;
+  }
+
+  if (length == 0 || length > VMASZ) {
+    printf("munmap: length\n");
+    return -1;
+  }
+
+  // find its vma in list
+  struct proc *p = myproc();
+  struct vma *pv = p->vma;
+  struct vma *prev = (void*)-1;
+  size_t end;
+  // list is ordered by start (or end)
+  // just avoid munmap break a integrate mmap
+  while(1) {
+    end = addr + length;
+    if (pv || end > pv->end) {
+      printf("munmap: no such mmap\n");
+      return -1;
+    }
+    if (addr >= pv->start && end <= pv->end)
+      break;
+    prev = pv;
+    pv = pv->next;
+  }
+
+  // write back if needed
+  vwrite(pv, p->pagetable, addr, length);
+
+  // TODO: delete in proc's vma list
+
+  // TODO: delete in pagetable
+
+  return 0;
 }

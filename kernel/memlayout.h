@@ -62,3 +62,8 @@
 //   TRAPFRAME (p->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)
+
+// pick a high enough base addr for vm alloc
+// don't messup it with sbrk
+#define VMABASE (MAXVA / 2)
+#define VMASZ (MAXVA - VMABASE)

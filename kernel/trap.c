@@ -29,6 +29,33 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+int
+pgfault(uint64 va, uint64 scause)
+{
+  // find the va in vma region list
+  // then load the region
+  struct proc *p = myproc();
+  struct vma *pv = p->vma;
+  while (pv && va < pv->start)
+    pv = pv->next;
+  if (pv == 0 || va >= pv->end) {
+    printf("pgfault: not mmap-ed\n");
+    return -1;
+  }
+
+  if(scause == 0xd && (pv->perms & PTE_R) == 0) {
+    printf("pgfault: mmap-ed, but not readable\n");
+    return -1;
+  }
+  if(scause == 0xf && (pv->perms & PTE_W) == 0) {
+    printf("pgfault: mmap-ed, but not writable\n");
+    return -1;
+  };
+
+  // map this page
+  return mmap(pv, p->pagetable, va);
+}
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -65,9 +92,13 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if(r_scause() == 15 || r_scause() == 13) {
+    if(pgfault(r_stval(), r_scause()) != 0)
+      goto fallback;
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
+  fallback:
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);

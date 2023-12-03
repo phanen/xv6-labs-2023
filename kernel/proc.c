@@ -322,6 +322,8 @@ fork(void)
   np->state = RUNNABLE;
   release(&np->lock);
 
+  // TODO: copy vma
+
   return pid;
 }
 
@@ -379,6 +381,8 @@ exit(int status)
   p->state = ZOMBIE;
 
   release(&wait_lock);
+
+  // TODO: munmap all vma
 
   // Jump into the scheduler, never to return.
   sched();
