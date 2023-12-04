@@ -32,28 +32,35 @@ trapinithart(void)
 int
 pgfault(uint64 va, uint64 scause)
 {
-  // find the va in vma region list
-  // then load the region
+  // find the va in vma list
   struct proc *p = myproc();
   struct vma *pv = p->vma;
-  while (pv && va < pv->start)
+  while (1) {
+    if (pv == 0 || va < pv->start) {
+      printf("pgfault: no vma\n");
+      return -1;
+    }
+    if (va < pv->end)
+      break;
     pv = pv->next;
-  if (pv == 0 || va >= pv->end) {
-    printf("pgfault: not mmap-ed\n");
-    return -1;
   }
+  printf("%p %p %p %p\n", pv, va, pv->start, pv->end);
 
   if(scause == 0xd && (pv->perms & PTE_R) == 0) {
-    printf("pgfault: mmap-ed, but not readable\n");
+    printf("pgfault: vma exists, but not readable\n");
     return -1;
   }
   if(scause == 0xf && (pv->perms & PTE_W) == 0) {
-    printf("pgfault: mmap-ed, but not writable\n");
+    printf("pgfault: vma exists, but not writable\n");
     return -1;
   };
 
   // map this page
-  return mmap(pv, p->pagetable, va);
+  if (mmap(pv, p->pagetable, va) == -1) {
+    printf("pgfault: mmap\n");
+    return -1;
+  }
+  return 0;
 }
 
 //
