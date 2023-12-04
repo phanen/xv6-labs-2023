@@ -44,7 +44,7 @@ pgfault(uint64 va, uint64 scause)
       break;
     pv = pv->next;
   }
-  printf("%p %p %p %p\n", pv, va, pv->start, pv->end);
+  // printf("%p %p %p %p\n", pv, va, pv->start, pv->end);
 
   if(scause == 0xd && (pv->perms & PTE_R) == 0) {
     printf("pgfault: vma exists, but not readable\n");

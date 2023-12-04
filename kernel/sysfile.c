@@ -548,15 +548,14 @@ sys_mmap(void)
     perms |= PTE_R;
   }
   if (prot & PROT_WRITE) {
-    // if writable in mem, then should not write back
-    if(f->writable == 0 && (flags & MAP_PRIVATE) == 0)
+    if((flags & MAP_SHARED) && f->writable == 0)
       return -1;
     perms |= PTE_W;
   }
   if (prot & PROT_EXEC)
     perms |= PTE_X;
 
-  struct vma* v = vget();
+  struct vma* v = valloc();
   v->perms = perms;
   v->file = f;
   v->offset = offset;
@@ -587,16 +586,7 @@ sys_mmap(void)
   return addr;
 }
 
-// writeback mmap-ed page from user's va
-static int
-vwrite(struct vma *v, pagetable_t pagetable, uint64 va, uint64 n){
-  // TODO: maybe need copyout
-  return 0;
-}
-
-// unmap
 // unmap at most one vma region
-// both addr and length should be page-aligned
 uint64
 sys_munmap(void)
 {
@@ -605,43 +595,55 @@ sys_munmap(void)
   argaddr(0, &addr);
   argaddr(1, &length);
 
-  // NOTE: both should be page-aligned
-  // otherwise, we
-  if (addr % PGSIZE != 0 || length % PGSIZE != 0) {
-    printf("munmap: not page-aligned\n");
+  if (length == 0 || length > VMASZ) {
+    printf("munmap: length\n");
     return -1;
   }
 
-  if (length == 0 || length > VMASZ) {
-    printf("munmap: length\n");
+  size_t end = addr + length;
+  // end should be page-aligned
+  if (end % PGSIZE != 0) {
+    printf("munmap: not page-aligned\n");
     return -1;
   }
 
   // find its vma in list
   struct proc *p = myproc();
   struct vma *pv = p->vma;
-  struct vma *prev = (void*)-1;
-  size_t end;
+  struct vma *prev = 0;
   // list is ordered by start (or end)
-  // just avoid munmap break a integrate mmap
-  while(1) {
-    end = addr + length;
-    if (pv || end > pv->end) {
-      printf("munmap: no such mmap\n");
-      return -1;
-    }
-    if (addr >= pv->start && end <= pv->end)
-      break;
+  while(pv && addr < pv->start) {
     prev = pv;
     pv = pv->next;
   }
+  if (pv == 0 || end > pv->end) {
+    printf("munmap: unmap out of region\n");
+    return -1;
+  }
 
-  // write back if needed
-  vwrite(pv, p->pagetable, addr, length);
+  munmap(pv, p->pagetable, addr, length);
 
-  // TODO: delete in proc's vma list
-
-  // TODO: delete in pagetable
-
+  // delete in proc's vma list and pagetable
+  // pv->start <= addr < end <= pv->end
+  if (pv->start == addr && end == pv->end) {
+    if (prev)
+      prev->next = pv->next;
+    else
+      p->vma = pv->next;
+    // free vma slot
+    vfree(pv);
+  }
+  else if (pv->start == addr && end != pv->end) {
+    pv->start = end;
+    pv->offset = pv->offset + (end - addr);
+  }
+  else if (pv->start != addr && end == pv->end) {
+    pv->end = addr;
+  }
+  else {
+    // TODO: need alloc a new vma
+    // since no testcase, we ignore it now
+    panic("unimpl\n");
+  }
   return 0;
 }

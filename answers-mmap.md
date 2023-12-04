@@ -29,5 +29,11 @@ why bother `mmap`, when there has been impl `read`/`write`
 - `mmap` can copy once instead of twice by pin mmap-ed file in bcache
 - useful for inter-process/user-kernel communication?
 
+inode size != mmap-ed file size
+- if mmap-ed size > inode size
+- write out of inode, then munmap -> ambiguous when write back
+  - throw a error or fill previous off with zero first?
+- maybe it's a undefined behavior?
+
 ref
 - <https://www.cnblogs.com/huxiao-tee/p/4660352.html>

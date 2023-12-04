@@ -252,7 +252,10 @@ void            sockrecvudp(struct mbuf*, uint32, uint16, uint16);
 
 // vma.c
 void            vmainit(void);
-struct vma*     vget(void);
+struct vma*     valloc(void);
+void            vfree(struct vma*);
+int             vwrite(struct vma*, uint64, int);
 int             mmap(struct vma*, pagetable_t, uint64);
+int             munmap(struct vma*, pagetable_t, uint64, uint64);
 
 #endif

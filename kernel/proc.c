@@ -323,7 +323,26 @@ fork(void)
   release(&np->lock);
 
   // TODO: copy vma
-
+  np->vma = 0;
+  struct vma *pv = p->vma;
+  struct vma *prev = 0;
+  while(pv) {
+    struct vma *v = valloc();
+    v->start = pv->start;
+    v->end = pv->end;
+    v->offset = pv->offset;
+    v->perms = pv->perms;
+    v->flags = pv->flags;
+    v->file = pv->file;
+    filedup(v->file);
+    v->next = 0;
+    if(prev == 0)
+      np->vma = v;
+    else
+      prev->next = v;
+    prev = v;
+    pv = pv->next;
+  }
   return pid;
 }
 
@@ -383,7 +402,15 @@ exit(int status)
   release(&wait_lock);
 
   // TODO: munmap all vma
-
+  struct vma* pv = p->vma;
+  while(pv) {
+    size_t n = pv->end - pv->start;
+    munmap(pv, p->pagetable, pv->start, n);
+    struct vma* next = pv->next;
+    vfree(pv);
+    pv = next;
+  }
+  p->vma = 0;
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
