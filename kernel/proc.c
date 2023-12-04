@@ -322,7 +322,6 @@ fork(void)
   np->state = RUNNABLE;
   release(&np->lock);
 
-  // TODO: copy vma
   np->vma = 0;
   struct vma *pv = p->vma;
   struct vma *prev = 0;
@@ -372,6 +371,16 @@ exit(int status)
   if(p == initproc)
     panic("init exiting");
 
+  struct vma* pv = p->vma;
+  while(pv) {
+    size_t n = pv->end - pv->start;
+    munmap(pv, p->pagetable, pv->start, n);
+    struct vma* next = pv->next;
+    vfree(pv);
+    pv = next;
+  }
+  p->vma = 0;
+
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
     if(p->ofile[fd]){
@@ -401,16 +410,6 @@ exit(int status)
 
   release(&wait_lock);
 
-  // TODO: munmap all vma
-  struct vma* pv = p->vma;
-  while(pv) {
-    size_t n = pv->end - pv->start;
-    munmap(pv, p->pagetable, pv->start, n);
-    struct vma* next = pv->next;
-    vfree(pv);
-    pv = next;
-  }
-  p->vma = 0;
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
